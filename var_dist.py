@@ -14,33 +14,8 @@ def collision_prob(p):
     return sum(p[c] ** 2 for c in string.ascii_lowercase)
 
 
-def letter_frequencies(text, normalize=False):
-    text = text.lower()
-
-    '''
-    text = ''.join(
-        c for c in unicodedata.normalize('NFD', text)
-        if unicodedata.category(c) != 'Mn'
-    )
-    '''
-    text = [c for c in text if c in string.ascii_lowercase]
-
-    unique = set(text)
-
-    assert unique == set(string.ascii_lowercase), unique
-
-    counts = {c: text.count(c) for c in unique}
-
-    if normalize:
-        return {c: n / len(text) for c, n in counts.items()}
-    else:
-        return counts
-
-
-if __name__ == "__main__":
-    # Collect data.
-    print(string.ascii_lowercase)
-    corpii = {}
+def load_texts(directory="."):
+    texts = {}
 
     for path in os.listdir("."):
         if "Alice" not in path:
@@ -51,7 +26,42 @@ if __name__ == "__main__":
         with open(path) as f:
             text = f.read()
 
-        corpii[language] = letter_frequencies(text, True)
+        texts[language] = text
+
+    return texts
+
+
+def letter_frequencies(text, normalize=False):
+    text = text.lower()
+
+    '''
+    text = ''.join(
+        c for c in unicodedata.normalize('NFD', text)
+        if unicodedata.category(c) != 'Mn'
+    )
+    '''
+    # Filter out any character that is not a lowercase ASCII letter.
+    text = [c for c in text if c in string.ascii_lowercase]
+    assert set(text) == set(string.ascii_lowercase)
+
+    # Count the frequency of each letter.
+    counts = {c: text.count(c) for c in string.ascii_lowercase}
+
+    if normalize:
+        total = sum(counts.values())
+        return {c: n / total for c, n in counts.items()}
+    else:
+        return counts
+
+
+if __name__ == "__main__":
+    # Collect data.
+    texts = load_texts()
+    print(texts.keys())
+
+    freqs = {
+        lang: letter_frequencies(text, True) for lang, text in texts.items()
+    }
 
     with open("permuted_cipher.txt") as f:
         cipher = f.read()
@@ -59,17 +69,17 @@ if __name__ == "__main__":
     # Generate results for question a and b.
     distances = {}
     collisions = {}
-    languages = sorted(corpii.keys())
+    languages = sorted(freqs.keys())
 
     for idx, lang_p in enumerate(languages):
-        p = corpii[lang_p]
+        p = freqs[lang_p]
         collisions[lang_p] = collision_prob(p)
 
         for lang_q in languages[idx:]:
             if lang_p == lang_q:
                 continue
 
-            q = corpii[lang_q]
+            q = freqs[lang_q]
             key = tuple(sorted([lang_p, lang_q]))
             distances[key] = total_variation_distance(p, q)
 
@@ -85,7 +95,7 @@ if __name__ == "__main__":
 
     distances = {
         lang: total_variation_distance(p, q)
-        for lang, q in corpii.items()
+        for lang, q in freqs.items()
     }
 
     distance_match = min(distances, key=distances.get)
